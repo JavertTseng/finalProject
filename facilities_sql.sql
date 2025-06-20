@@ -7,7 +7,7 @@ DROP TABLE if exists facilities;
 DROP TABLE if exists facility_images;
 DROP TABLE if exists facility_reservation_table;
 
-
+-- 公共設施表
 CREATE TABLE facilities (
 	facility_id INT IDENTITY(1,1) PRIMARY KEY,           -- 公設ID，自動遞增
 	community_id INT,                                    -- 社區識別欄位
@@ -21,9 +21,10 @@ CREATE TABLE facilities (
 	facility_status NVARCHAR(20) DEFAULT 'acitve',       -- 使用狀態：啟用、停用、維修中等    
     created_at DATETIME DEFAULT GETDATE(),               -- 建立時間
     updated_at DATETIME                                  -- 最後更新時間
-	FOREIGN KEY (community_id) REFERENCES communities(community_id),
+	--FOREIGN KEY (community_id) REFERENCES communities(community_id),
 );
 
+-- 公共設施圖片
 CREATE TABLE facility_images (
     image_id INT IDENTITY(1,1) PRIMARY KEY,           -- 照片主鍵
     facility_id INT NOT NULL,                         -- 關聯公設
@@ -35,7 +36,8 @@ CREATE TABLE facility_images (
     FOREIGN KEY (facility_id) REFERENCES facilities(facility_id)
 );
 
-CREATE TABLE facility_reservation_table (
+-- 公設預約表
+CREATE TABLE facility_reservation (
     reservation_id INT IDENTITY(1,1) PRIMARY KEY,          -- 預約紀錄 ID
     community_id INT,                                      -- 所屬社區 ID
     unit_id INT NOT NULL,                                  -- 預約者所屬住戶單位 ID
@@ -53,10 +55,61 @@ CREATE TABLE facility_reservation_table (
     updated_at DATETIME,                                   -- 最後修改時間   
     canceled_at DATETIME,                                  -- 取消時間（可為 NULL）
     cancel_reason NVARCHAR(255),                           -- 取消原因
-    FOREIGN KEY (community_id) REFERENCES communities(community_id),
+    --FOREIGN KEY (community_id) REFERENCES communities(community_id),
     FOREIGN KEY (facility_id) REFERENCES facilities(facility_id)
     -- FOREIGN KEY (unit_id) REFERENCES units(unit_id)
 );
+
+
+-- 住戶點數帳戶表 (point_accounts)，記錄每戶當前可用點數
+CREATE TABLE point_account (
+    account_id INT IDENTITY(1,1) PRIMARY KEY,        -- 帳戶編號
+    community_id INT NOT NULL,                       -- 所屬社區
+    unit_id INT NOT NULL,                            -- 所屬住戶單位
+    total_balance INT DEFAULT 0,                     -- 總可用點數
+    system_balance INT DEFAULT 0,                    -- 系統撥發點數（有效期限）
+    topup_balance INT DEFAULT 0,                     -- 儲值點數（無效期限）
+    updated_at DATETIME DEFAULT GETDATE(),           -- 最後更新時間
+    CONSTRAINT UQ_unit_community UNIQUE (unit_id, community_id)
+    -- FOREIGN KEY (community_id) REFERENCES communities(community_id)
+    -- FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+);
+
+-- 2. 點數來源與效期明細表 (point_sources)
+CREATE TABLE point_source (
+    source_id INT IDENTITY(1,1) PRIMARY KEY,          -- 點數來源 ID
+    community_id INT NOT NULL,                        -- 所屬社區
+    unit_id INT NOT NULL,                             -- 所屬住戶單位
+    source_type NVARCHAR(50) NOT NULL,                -- monthly、topup 等
+    amount INT NOT NULL,                              -- 發放點數
+    remaining INT NOT NULL,                           -- 剩餘可用點數
+    issued_at DATETIME DEFAULT GETDATE(),             -- 發放時間
+    expired_at DATETIME NULL,                         -- 到期時間（NULL 為永久）
+    point_status NVARCHAR(20) DEFAULT 'active'        -- active / expired / used_up
+    -- FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+);
+
+-- 3. 點數異動紀錄表 (point_transactions)
+CREATE TABLE point_transaction (
+    transaction_id INT IDENTITY(1,1) PRIMARY KEY,      -- 交易 ID
+    community_id INT NOT NULL,                         -- 所屬社區
+    unit_id INT NOT NULL,                              -- 當事住戶單位
+    source_id INT NULL,                                -- 對應的點數來源
+    change_type NVARCHAR(50) NOT NULL,                 -- reservation / cancel / topup / transfer_in / transfer_out...
+    amount INT NOT NULL,                               -- 正為加點，負為扣點
+    related_unit_id INT NULL,                          -- 轉移點數時的對象住戶
+    transaction_description NVARCHAR(255),             -- 備註說明
+    created_at DATETIME DEFAULT GETDATE(),             -- 建立時間
+    FOREIGN KEY (source_id) REFERENCES point_source(source_id)
+);
+
+
+
+
+
+
+
+
 
 
 
